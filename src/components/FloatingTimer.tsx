@@ -31,22 +31,41 @@ export function FloatingTimer({
     id: "floating-timer",
   });
 
-  const style = transform ? {
-    transform: `translate3d(${transform.x + position.x}px, ${transform.y + position.y}px, 0)`,
-  } : {
-    transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
+  // Function to constrain position within viewport
+  const constrainPosition = (x: number, y: number) => {
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const timerWidth = 300; // Approximate width of timer
+    const timerHeight = 100; // Approximate height of timer
+
+    return {
+      x: Math.min(Math.max(x, 0), windowWidth - timerWidth),
+      y: Math.min(Math.max(y, 0), windowHeight - timerHeight)
+    };
   };
 
   React.useEffect(() => {
     if (transform) {
-      const newPosition = {
-        x: position.x + transform.x,
-        y: position.y + transform.y
-      };
+      const newPosition = constrainPosition(
+        position.x + transform.x,
+        position.y + transform.y
+      );
       setPosition(newPosition);
       localStorage.setItem('timer_position', JSON.stringify(newPosition));
     }
   }, [transform]);
+
+  // Add window resize handler
+  React.useEffect(() => {
+    const handleResize = () => {
+      const constrained = constrainPosition(position.x, position.y);
+      setPosition(constrained);
+      localStorage.setItem('timer_position', JSON.stringify(constrained));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [position]);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -91,6 +110,14 @@ export function FloatingTimer({
     setStartTime(null);
   };
 
+  const style = {
+    transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    zIndex: 50,
+  } as const;
+
   return (
     <>
       <div 
@@ -98,7 +125,7 @@ export function FloatingTimer({
         {...listeners}
         {...attributes}
         style={style}
-        className="fixed z-50 cursor-move"
+        className="cursor-move"
       >
         <div
           className={cn(
