@@ -10,7 +10,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 
 interface AnalyticsModalProps {
   open: boolean;
@@ -71,9 +71,21 @@ export function AnalyticsModal({
                 <YAxis />
                 <Bar dataKey="hours" name="Hours" fill="var(--color-hours)" />
                 <Bar dataKey="minutes" name="Minutes" fill="var(--color-minutes)" />
-                <ChartTooltip>
-                  <ChartTooltipContent />
-                </ChartTooltip>
+                <Tooltip content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="rounded-lg border bg-background p-2 shadow-md">
+                        <p className="font-medium">{label}</p>
+                        {payload.map((entry) => (
+                          <p key={entry.name} className="text-sm">
+                            {entry.name}: {entry.value}
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
