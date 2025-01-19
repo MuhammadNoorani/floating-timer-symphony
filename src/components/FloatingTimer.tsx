@@ -1,9 +1,11 @@
 import * as React from "react";
-import { Play, Pause, RotateCcw, FileText, BarChart2 } from "lucide-react";
+import { Play, Pause, RotateCcw, FileText, BarChart2, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotesModal } from "./NotesModal";
 import { AnalyticsModal } from "./AnalyticsModal";
 import { useDraggable } from "@dnd-kit/core";
+import { queueUpdate } from "@/lib/notion";
+import { toast } from "sonner";
 
 interface FloatingTimerProps {
   taskName?: string;
@@ -19,7 +21,11 @@ export function FloatingTimer({
   const [isRunning, setIsRunning] = React.useState(false);
   const [showNotes, setShowNotes] = React.useState(false);
   const [showAnalytics, setShowAnalytics] = React.useState(false);
-  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [position, setPosition] = React.useState(() => {
+    const saved = localStorage.getItem('timer_position');
+    return saved ? JSON.parse(saved) : { x: 20, y: 20 };
+  });
+  const [startTime, setStartTime] = React.useState<Date | null>(null);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: "floating-timer",
@@ -33,16 +39,19 @@ export function FloatingTimer({
 
   React.useEffect(() => {
     if (transform) {
-      setPosition(prev => ({
-        x: prev.x + transform.x,
-        y: prev.y + transform.y
-      }));
+      const newPosition = {
+        x: position.x + transform.x,
+        y: position.y + transform.y
+      };
+      setPosition(newPosition);
+      localStorage.setItem('timer_position', JSON.stringify(newPosition));
     }
   }, [transform]);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isRunning) {
+      if (!startTime) setStartTime(new Date());
       interval = setInterval(() => {
         setTime((prevTime) => prevTime + 1);
       }, 1000);
@@ -59,10 +68,27 @@ export function FloatingTimer({
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const toggleTimer = () => setIsRunning(!isRunning);
+  const toggleTimer = () => {
+    if (!isRunning && !startTime) {
+      setStartTime(new Date());
+    }
+    setIsRunning(!isRunning);
+  };
+
   const resetTimer = () => {
+    if (time > 0 && startTime) {
+      queueUpdate({
+        taskName,
+        startTime: startTime.toISOString(),
+        endTime: new Date().toISOString(),
+        totalTime: time,
+        notes: localStorage.getItem(`notes-${taskName}`) || ''
+      });
+      toast.success("Task data queued for sync");
+    }
     setTime(0);
     setIsRunning(false);
+    setStartTime(null);
   };
 
   return (
