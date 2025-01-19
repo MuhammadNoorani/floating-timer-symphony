@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, FileText, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotesModal } from "./NotesModal";
 import { AnalyticsModal } from "./AnalyticsModal";
+import { useDraggable } from "@dnd-kit/core";
 
 interface FloatingTimerProps {
   taskName?: string;
@@ -18,6 +19,26 @@ export function FloatingTimer({
   const [isRunning, setIsRunning] = React.useState(false);
   const [showNotes, setShowNotes] = React.useState(false);
   const [showAnalytics, setShowAnalytics] = React.useState(false);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: "floating-timer",
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x + position.x}px, ${transform.y + position.y}px, 0)`,
+  } : {
+    transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
+  };
+
+  React.useEffect(() => {
+    if (transform) {
+      setPosition(prev => ({
+        x: prev.x + transform.x,
+        y: prev.y + transform.y
+      }));
+    }
+  }, [transform]);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -46,7 +67,13 @@ export function FloatingTimer({
 
   return (
     <>
-      <div className="fixed left-1/2 top-4 -translate-x-1/2 z-50 animate-fade-in">
+      <div 
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        style={style}
+        className="fixed z-50 cursor-move"
+      >
         <div
           className={cn(
             "group relative flex items-center rounded-full bg-zinc-900/90 backdrop-blur-sm transition-all duration-300 ease-in-out",
