@@ -1,16 +1,23 @@
 import * as React from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause, RotateCcw, FileText, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotesModal } from "./NotesModal";
+import { AnalyticsModal } from "./AnalyticsModal";
 
 interface FloatingTimerProps {
   taskName?: string;
   initialTime?: number;
 }
 
-export function FloatingTimer({ taskName = "Current Task", initialTime = 0 }: FloatingTimerProps) {
+export function FloatingTimer({
+  taskName = "Current Task",
+  initialTime = 0,
+}: FloatingTimerProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [time, setTime] = React.useState(initialTime);
   const [isRunning, setIsRunning] = React.useState(false);
+  const [showNotes, setShowNotes] = React.useState(false);
+  const [showAnalytics, setShowAnalytics] = React.useState(false);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -38,48 +45,77 @@ export function FloatingTimer({ taskName = "Current Task", initialTime = 0 }: Fl
   };
 
   return (
-    <div className="fixed left-1/2 top-4 -translate-x-1/2 z-50 animate-fade-in">
-      <div
-        className={cn(
-          "group relative flex items-center rounded-full bg-zinc-900/90 backdrop-blur-sm transition-all duration-300 ease-in-out",
-          isExpanded ? "pr-4" : "pr-2"
-        )}
-        onMouseEnter={() => setIsExpanded(true)}
-        onMouseLeave={() => setIsExpanded(false)}
-      >
-        <div className="flex items-center gap-2 px-4 py-2">
-          <span className="text-sm font-medium text-zinc-200 whitespace-nowrap">
-            {taskName}
-          </span>
-          <span className="font-medium text-zinc-200">{formatTime(time)}</span>
-        </div>
-
+    <>
+      <div className="fixed left-1/2 top-4 -translate-x-1/2 z-50 animate-fade-in">
         <div
           className={cn(
-            "flex items-center gap-2 overflow-hidden transition-all duration-300",
-            isExpanded ? "w-auto opacity-100" : "w-0 opacity-0"
+            "group relative flex items-center rounded-full bg-zinc-900/90 backdrop-blur-sm transition-all duration-300 ease-in-out",
+            isExpanded ? "pr-4" : "pr-2"
           )}
+          onMouseEnter={() => setIsExpanded(true)}
+          onMouseLeave={() => setIsExpanded(false)}
         >
-          <button
-            className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            onClick={toggleTimer}
-            aria-label={isRunning ? "Pause timer" : "Start timer"}
-          >
-            {isRunning ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
+          <div className="flex items-center gap-2 px-4 py-2">
+            <span className="text-sm font-medium text-zinc-200 whitespace-nowrap">
+              {taskName}
+            </span>
+            <span className="font-medium text-zinc-200">{formatTime(time)}</span>
+          </div>
+
+          <div
+            className={cn(
+              "flex items-center gap-2 overflow-hidden transition-all duration-300",
+              isExpanded ? "w-auto opacity-100" : "w-0 opacity-0"
             )}
-          </button>
-          <button
-            className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            onClick={resetTimer}
-            aria-label="Reset timer"
           >
-            <RotateCcw className="h-4 w-4" />
-          </button>
+            <button
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              onClick={() => setShowNotes(true)}
+              aria-label="View notes"
+            >
+              <FileText className="h-4 w-4" />
+            </button>
+            <button
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              onClick={() => setShowAnalytics(true)}
+              aria-label="View analytics"
+            >
+              <BarChart2 className="h-4 w-4" />
+            </button>
+            <button
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              onClick={toggleTimer}
+              aria-label={isRunning ? "Pause timer" : "Start timer"}
+            >
+              {isRunning ? (
+                <Pause className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              onClick={resetTimer}
+              aria-label="Reset timer"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      <NotesModal
+        open={showNotes}
+        onOpenChange={setShowNotes}
+        taskName={taskName}
+      />
+      
+      <AnalyticsModal
+        open={showAnalytics}
+        onOpenChange={setShowAnalytics}
+        taskName={taskName}
+        totalTime={time}
+      />
+    </>
   );
 }
