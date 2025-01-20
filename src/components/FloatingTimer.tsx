@@ -1,10 +1,11 @@
 import * as React from "react";
-import { Play, Pause, RotateCcw, FileText, BarChart2 } from "lucide-react";
+import { Play, Pause, RotateCcw, FileText, BarChart2, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotesModal } from "./NotesModal";
 import { AnalyticsModal } from "./AnalyticsModal";
+import { TaskSelector } from "./TaskSelector";
 import { useDraggable } from "@dnd-kit/core";
-import { queueUpdate } from "@/lib/notion";
+import { queueUpdate, fetchTasks } from "@/lib/notion";
 import { toast } from "sonner";
 
 interface FloatingTimerProps {
@@ -21,51 +22,44 @@ export function FloatingTimer({
   const [isRunning, setIsRunning] = React.useState(false);
   const [showNotes, setShowNotes] = React.useState(false);
   const [showAnalytics, setShowAnalytics] = React.useState(false);
+  const [showTaskSelector, setShowTaskSelector] = React.useState(false);
+  const [currentTask, setCurrentTask] = React.useState(taskName);
   const [position, setPosition] = React.useState(() => {
     const saved = localStorage.getItem('timer_position');
     return saved ? JSON.parse(saved) : { x: window.innerWidth / 2 - 150, y: 20 };
   });
   const [startTime, setStartTime] = React.useState<Date | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
 
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: "floating-timer",
-  });
-
-  // Function to constrain position within viewport
-  const constrainPosition = (x: number, y: number) => {
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    const timerWidth = 300; // Approximate width of timer
-    const timerHeight = 100; // Approximate height of timer
-
-    return {
-      x: Math.min(Math.max(x, 0), windowWidth - timerWidth),
-      y: Math.min(Math.max(y, 0), windowHeight - timerHeight)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const newX = e.clientX - offsetX;
+      const newY = e.clientY - offsetY;
+      
+      // Constrain to viewport
+      const maxX = window.innerWidth - rect.width;
+      const maxY = window.innerHeight - rect.height;
+      const x = Math.max(0, Math.min(newX, maxX));
+      const y = Math.max(0, Math.min(newY, maxY));
+      
+      setPosition({ x, y });
     };
+    
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      localStorage.setItem('timer_position', JSON.stringify(position));
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
-
-  React.useEffect(() => {
-    if (transform) {
-      const newPosition = constrainPosition(
-        position.x + transform.x,
-        position.y + transform.y
-      );
-      setPosition(newPosition);
-      localStorage.setItem('timer_position', JSON.stringify(newPosition));
-    }
-  }, [transform]);
-
-  // Add window resize handler
-  React.useEffect(() => {
-    const handleResize = () => {
-      const constrained = constrainPosition(position.x, position.y);
-      setPosition(constrained);
-      localStorage.setItem('timer_position', JSON.stringify(constrained));
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [position]);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -97,11 +91,11 @@ export function FloatingTimer({
   const resetTimer = () => {
     if (time > 0 && startTime) {
       queueUpdate({
-        taskName,
+        taskName: currentTask,
         startTime: startTime.toISOString(),
         endTime: new Date().toISOString(),
         totalTime: time,
-        notes: localStorage.getItem(`notes-${taskName}`) || ''
+        notes: localStorage.getItem(`notes-${currentTask}`) || ''
       });
       toast.success("Task data queued for sync");
     }
@@ -116,16 +110,14 @@ export function FloatingTimer({
     top: 0,
     left: 0,
     zIndex: 50,
+    cursor: isDragging ? 'grabbing' : 'grab',
   } as const;
 
   return (
     <>
       <div 
-        ref={setNodeRef}
-        {...listeners}
-        {...attributes}
+        onMouseDown={handleMouseDown}
         style={style}
-        className="cursor-move"
       >
         <div
           className={cn(
@@ -137,7 +129,7 @@ export function FloatingTimer({
         >
           <div className="flex items-center gap-2 px-4 py-2">
             <span className="text-sm font-medium text-zinc-200 whitespace-nowrap">
-              {taskName}
+              {currentTask}
             </span>
             <span className="font-medium text-zinc-200">{formatTime(time)}</span>
           </div>
@@ -148,6 +140,13 @@ export function FloatingTimer({
               isExpanded ? "w-auto opacity-100" : "w-0 opacity-0"
             )}
           >
+            <button
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              onClick={() => setShowTaskSelector(true)}
+              aria-label="Select task"
+            >
+              <List className="h-4 w-4" />
+            </button>
             <button
               className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
               onClick={() => setShowNotes(true)}
@@ -187,14 +186,23 @@ export function FloatingTimer({
       <NotesModal
         open={showNotes}
         onOpenChange={setShowNotes}
-        taskName={taskName}
+        taskName={currentTask}
       />
       
       <AnalyticsModal
         open={showAnalytics}
         onOpenChange={setShowAnalytics}
-        taskName={taskName}
+        taskName={currentTask}
         totalTime={time}
+      />
+
+      <TaskSelector
+        open={showTaskSelector}
+        onOpenChange={setShowTaskSelector}
+        onSelect={(task) => {
+          setCurrentTask(task);
+          setShowTaskSelector(false);
+        }}
       />
     </>
   );

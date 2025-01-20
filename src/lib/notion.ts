@@ -11,6 +11,30 @@ export const initNotion = (apiKey: string) => {
 export const syncQueue = new Map();
 let isSyncing = false;
 
+export const fetchTasks = async () => {
+  if (!notionClient) return [];
+  
+  try {
+    const response = await notionClient.databases.query({
+      database_id: localStorage.getItem('notion_database_id') || '',
+      sorts: [{ property: 'Start Time', direction: 'descending' }],
+    });
+    
+    return response.results.map((page: any) => ({
+      id: page.id,
+      name: page.properties.Name.title[0]?.text.content || 'Untitled',
+      startTime: page.properties['Start Time']?.date?.start,
+      endTime: page.properties['End Time']?.date?.start,
+      totalTime: page.properties['Total Time']?.number || 0,
+      notes: page.properties.Notes?.rich_text[0]?.text.content || '',
+    }));
+  } catch (error) {
+    console.error('Error fetching tasks:', error);
+    toast.error('Failed to fetch tasks from Notion');
+    return [];
+  }
+};
+
 const processSyncQueue = async () => {
   if (isSyncing || syncQueue.size === 0) return;
   
