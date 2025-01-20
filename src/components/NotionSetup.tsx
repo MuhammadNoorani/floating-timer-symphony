@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { initNotion } from "@/lib/notion";
+import { initializeNotion } from "@/lib/notion-config";
 
 export function NotionSetup() {
   const [apiKey, setApiKey] = React.useState("");
@@ -15,8 +15,9 @@ export function NotionSetup() {
   const [isOpen, setIsOpen] = React.useState(!localStorage.getItem('notion_api_key'));
 
   const handleSetup = () => {
-    initNotion(apiKey);
+    localStorage.setItem('notion_api_key', apiKey);
     localStorage.setItem('notion_database_id', databaseId);
+    initializeNotion();
     setIsOpen(false);
   };
 
