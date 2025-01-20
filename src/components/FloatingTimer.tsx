@@ -1,11 +1,11 @@
 import * as React from "react";
-import { Play, Pause, RotateCcw, FileText, BarChart2, List } from "lucide-react";
+import { Play, Pause, RotateCcw, FileText, BarChart2, List, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotesModal } from "./NotesModal";
 import { AnalyticsModal } from "./AnalyticsModal";
 import { TaskSelector } from "./TaskSelector";
-import { useDraggable } from "@dnd-kit/core";
-import { queueUpdate, fetchTasks } from "@/lib/notion";
+import { TimerSettings } from "./TimerSettings";
+import { queueUpdate, fetchTasks, triggerSync } from "@/lib/notion";
 import { toast } from "sonner";
 
 interface FloatingTimerProps {
@@ -19,10 +19,12 @@ export function FloatingTimer({
 }: FloatingTimerProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [time, setTime] = React.useState(initialTime);
+  const [targetTime, setTargetTime] = React.useState<number | null>(null);
   const [isRunning, setIsRunning] = React.useState(false);
   const [showNotes, setShowNotes] = React.useState(false);
   const [showAnalytics, setShowAnalytics] = React.useState(false);
   const [showTaskSelector, setShowTaskSelector] = React.useState(false);
+  const [showTimerSettings, setShowTimerSettings] = React.useState(false);
   const [currentTask, setCurrentTask] = React.useState(taskName);
   const [position, setPosition] = React.useState(() => {
     const saved = localStorage.getItem('timer_position');
@@ -32,6 +34,7 @@ export function FloatingTimer({
   const [isDragging, setIsDragging] = React.useState(false);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only handle left click
     setIsDragging(true);
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     const offsetX = e.clientX - rect.left;
@@ -66,11 +69,18 @@ export function FloatingTimer({
     if (isRunning) {
       if (!startTime) setStartTime(new Date());
       interval = setInterval(() => {
-        setTime((prevTime) => prevTime + 1);
+        setTime((prevTime) => {
+          if (targetTime && prevTime >= targetTime) {
+            setIsRunning(false);
+            toast.success("Timer completed!");
+            return targetTime;
+          }
+          return prevTime + 1;
+        });
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isRunning]);
+  }, [isRunning, targetTime]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -97,9 +107,10 @@ export function FloatingTimer({
         totalTime: time,
         notes: localStorage.getItem(`notes-${currentTask}`) || ''
       });
-      toast.success("Task data queued for sync");
+      triggerSync();
     }
     setTime(0);
+    setTargetTime(null);
     setIsRunning(false);
     setStartTime(null);
   };
@@ -111,6 +122,7 @@ export function FloatingTimer({
     left: 0,
     zIndex: 50,
     cursor: isDragging ? 'grabbing' : 'grab',
+    touchAction: 'none',
   } as const;
 
   return (
@@ -132,6 +144,11 @@ export function FloatingTimer({
               {currentTask}
             </span>
             <span className="font-medium text-zinc-200">{formatTime(time)}</span>
+            {targetTime && (
+              <span className="text-sm text-zinc-400">
+                / {formatTime(targetTime)}
+              </span>
+            )}
           </div>
 
           <div
@@ -146,6 +163,13 @@ export function FloatingTimer({
               aria-label="Select task"
             >
               <List className="h-4 w-4" />
+            </button>
+            <button
+              className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              onClick={() => setShowTimerSettings(true)}
+              aria-label="Timer settings"
+            >
+              <Clock className="h-4 w-4" />
             </button>
             <button
               className="rounded-full p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
@@ -202,6 +226,16 @@ export function FloatingTimer({
         onSelect={(task) => {
           setCurrentTask(task);
           setShowTaskSelector(false);
+        }}
+      />
+
+      <TimerSettings
+        open={showTimerSettings}
+        onOpenChange={setShowTimerSettings}
+        onSetTimer={(seconds) => {
+          setTargetTime(seconds);
+          setTime(0);
+          setShowTimerSettings(false);
         }}
       />
     </>
