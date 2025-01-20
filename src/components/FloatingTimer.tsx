@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Play, Pause, RotateCcw, FileText, BarChart2, Cloud } from "lucide-react";
+import { Play, Pause, RotateCcw, FileText, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotesModal } from "./NotesModal";
 import { AnalyticsModal } from "./AnalyticsModal";
@@ -23,7 +23,7 @@ export function FloatingTimer({
   const [showAnalytics, setShowAnalytics] = React.useState(false);
   const [position, setPosition] = React.useState(() => {
     const saved = localStorage.getItem('timer_position');
-    return saved ? JSON.parse(saved) : { x: 20, y: 20 };
+    return saved ? JSON.parse(saved) : { x: window.innerWidth / 2 - 150, y: 20 };
   });
   const [startTime, setStartTime] = React.useState<Date | null>(null);
 
