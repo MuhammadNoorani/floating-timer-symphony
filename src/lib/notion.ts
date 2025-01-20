@@ -1,11 +1,12 @@
 import { Client } from "@notionhq/client";
 import { toast } from "sonner";
+import { getNotionConfig } from "./notion-config";
 
 let notionClient: Client | null = null;
 
-export const initNotion = (apiKey: string) => {
-  notionClient = new Client({ auth: apiKey });
-  localStorage.setItem('notion_api_key', apiKey);
+export const initNotion = () => {
+  const config = getNotionConfig();
+  notionClient = new Client({ auth: config.apiKey });
   startPeriodicSync();
 };
 
@@ -17,6 +18,7 @@ interface QueuedUpdate {
   endTime: string;
   totalTime: number;
   notes: string;
+  completed?: boolean;
   retryCount?: number;
 }
 
@@ -44,7 +46,7 @@ export const fetchTasks = async () => {
   
   try {
     const response = await notionClient.databases.query({
-      database_id: localStorage.getItem('notion_database_id') || '',
+      database_id: getNotionConfig().databaseId,
       sorts: [{ property: 'Start Time', direction: 'descending' }],
     });
     
@@ -55,16 +57,15 @@ export const fetchTasks = async () => {
       endTime: page.properties['End Time']?.date?.start,
       totalTime: page.properties['Total Time']?.number || 0,
       notes: page.properties.Notes?.rich_text[0]?.text.content || '',
+      completed: page.properties['Completed']?.checkbox || false,
     }));
 
-    // Cache tasks in localStorage
     localStorage.setItem('cached_tasks', JSON.stringify(tasks));
     return tasks;
   } catch (error) {
     console.error('Error fetching tasks:', error);
     toast.error('Failed to fetch tasks from Notion');
     
-    // Return cached tasks if available
     const cachedTasks = localStorage.getItem('cached_tasks');
     return cachedTasks ? JSON.parse(cachedTasks) : [];
   }
@@ -82,13 +83,14 @@ const processSyncQueue = async () => {
       
       try {
         await notionClient.pages.create({
-          parent: { database_id: localStorage.getItem('notion_database_id') || '' },
+          parent: { database_id: getNotionConfig().databaseId },
           properties: {
             Name: { title: [{ text: { content: update.taskName } }] },
             "Start Time": { date: { start: update.startTime } },
             "End Time": { date: { start: update.endTime } },
             "Total Time": { number: update.totalTime },
-            Notes: { rich_text: [{ text: { content: update.notes } }] }
+            Notes: { rich_text: [{ text: { content: update.notes } }] },
+            Completed: { checkbox: update.completed || false }
           }
         });
         
@@ -98,7 +100,6 @@ const processSyncQueue = async () => {
       } catch (error) {
         console.error("Error syncing update:", error);
         
-        // Implement exponential backoff
         if (!update.retryCount || update.retryCount < 3) {
           update.retryCount = (update.retryCount || 0) + 1;
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, update.retryCount) * 1000));
